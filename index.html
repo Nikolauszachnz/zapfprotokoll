@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>🍺 Zapfprotokoll</title>
+  <style>
+    body { font-family: Arial; padding: 20px; max-width: 500px; margin: auto; }
+    input, select, button, textarea { width: 100%; padding: 12px; margin: 8px 0; font-size: 16px; }
+    button { background: #28a745; color: white; border: none; font-weight: bold; }
+    label { display: block; margin-top: 15px; font-weight: bold; }
+    .radio-group { display: flex; gap: 15px; margin-top: 5px; }
+    .radio-option { flex: 1; text-align: center; padding: 12px; 
+                     border: 2px solid #ddd; border-radius: 8px;
+                     background: white; cursor: pointer; }
+    .radio-option.selected { border-color: #28a745; background: #e8f5e8; }
+    .radio-option input { display: none; }
+  </style>
+</head>
+<body>
+
+<h1>🍺 Zapfprotokoll</h1>
+
+<form id="form">
+  <label>Datum:</label>
+  <input type="datetime-local" id="zeit" required>
+  
+  <label>CO₂ Flasche:</label>
+  <select id="flasche" required>
+    <option value="">Auswählen</option>
+    <option value="Flasche 1">Flasche 1</option>
+    <option value="Flasche 2">Flasche 2</option>
+  </select>
+  
+  <label>Restdruck CO₂ (bar):</label>
+  <input type="number" id="druck" step="0.1" required>
+  
+  <label>Gezapft Bier (L):</label>
+  <input type="number" id="liter" step="0.1" required>
+  
+  <label>Neues Fass geöffnet?</label>
+  <div class="radio-group">
+    <div class="radio-option" onclick="selectFass('ja')">
+      <input type="radio" id="fassJa" name="neuesFass" value="JA">
+      <strong>JA</strong>
+    </div>
+    <div class="radio-option" onclick="selectFass('nein')">
+      <input type="radio" id="fassNein" name="neuesFass" value="NEIN" checked>
+      <strong>NEIN</strong>
+    </div>
+  </div>
+  
+  <label>Restbestand Fässer (optional):</label>
+  <input type="number" id="restFaesser" step="1" 
+         placeholder="z.B. 3">
+  
+  <label>Notizen:</label>
+  <textarea id="notizen" rows="3"></textarea>
+  
+  <button type="button" onclick="sendMail()">📧 Loggen</button>
+</form>
+
+<script>
+// Auto-Datum
+document.getElementById('zeit').value = new Date().toISOString().slice(0,16);
+
+function selectFass(wert) {
+  document.querySelectorAll('input[name="neuesFass"]').forEach(r => {
+    r.checked = (r.value === wert);
+  });
+  document.querySelectorAll('.radio-option').forEach(opt => {
+    opt.classList.remove('selected');
+  });
+  event.target.closest('.radio-option').classList.add('selected');
+}
+
+function sendMail() {
+  const zeit = document.getElementById('zeit').value;
+  const flasche = document.getElementById('flasche').value;
+  const druck = document.getElementById('druck').value;
+  const liter = document.getElementById('liter').value;
+  const neuesFass = document.querySelector('input[name="neuesFass"]:checked').value;
+  const restFaesser = document.getElementById('restFaesser').value;
+  const notizen = document.getElementById('notizen').value;
+
+  // *** DEINE ECHTEN ADRESSEN ***
+  const to = 'anna.dallinger@edu.kl.ac.at';
+  const cc = 'nikolaus.zach@edu.kl.ac.at,events@oeh-kl.at';
+
+  const subject = encodeURIComponent(`CO2 ${flasche}: ${druck} bar | Fass: ${neuesFass}`);
+  const body = encodeURIComponent(`
+Zapfprotokoll
+
+⏰ Zeit: ${zeit}
+🏷️ CO₂: ${flasche} (${druck} bar)
+🍺 Bier: ${liter} L
+🔄 Neues Fass: ${neuesFass}
+${restFaesser ? `📦 Rest Fässer: ${restFaesser}` : ''}
+
+📝 Notizen: ${notizen || '---'}
+  `);
+
+  window.location.href = `mailto:${to}?cc=${cc}&subject=${subject}&body=${body}`;
+}
+</script>
+
+</body>
+</html>
