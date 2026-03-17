@@ -4,30 +4,94 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="referrer" content="origin">
-  <title>Zapfprotokoll</title>
+  <title>🍺 Zapfprotokoll</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; max-width: 520px; margin: auto; background: #f9f9f9; }
-    h1 { text-align: center; }
-    form { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-    input, select, textarea, button { width: 100%; padding: 14px; margin: 8px 0; font-size: 16px; box-sizing: border-box; }
-    button { background: #28a745; color: white; border: 0; border-radius: 8px; font-weight: bold; }
-    label { display: block; margin-top: 14px; font-weight: bold; }
-    .radio-group { display: flex; gap: 10px; margin-top: 8px; }
-    .radio-option { flex: 1; text-align: center; padding: 14px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; }
-    .radio-option.selected { border-color: #28a745; background: #e8f5e8; }
-    .radio-option input { display: none; }
-    .error { border: 2px solid red !important; }
-    .error-text { color: red; font-size: 14px; margin: -2px 0 8px; }
-    .status { margin-top: 12px; font-size: 14px; color: #333; }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 520px;
+      margin: auto;
+      background: #f7f7f7;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    form {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    label {
+      display: block;
+      margin-top: 14px;
+      font-weight: bold;
+    }
+    input, select, textarea, button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 6px;
+      font-size: 16px;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    button {
+      background: #28a745;
+      color: white;
+      border: none;
+      font-weight: bold;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+    .radio-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .radio-option {
+      flex: 1;
+      text-align: center;
+      padding: 14px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      cursor: pointer;
+      background: white;
+    }
+    .radio-option.selected {
+      border-color: #28a745;
+      background: #e8f5e8;
+    }
+    .radio-option input {
+      display: none;
+    }
+    .error {
+      border: 2px solid red !important;
+    }
+    .error-text {
+      color: red;
+      font-size: 14px;
+      margin-top: 4px;
+    }
+    .status {
+      margin-top: 14px;
+      font-size: 14px;
+    }
+    .success {
+      color: #1e7e34;
+    }
+    .fail {
+      color: #b00020;
+    }
   </style>
 </head>
 <body>
 
 <h1>🍺 Zapfprotokoll</h1>
 
-<form id="zapfForm" action="https://formspree.io/f/maqplozn" method="POST" novalidate>
+<form id="zapfForm" novalidate>
   <input type="hidden" name="_subject" value="Neuer Zapfeintrag">
-  <input type="hidden" name="_format" value="plain">
 
   <label for="zeit">Datum & Uhrzeit:</label>
   <input type="datetime-local" id="zeit" name="Zeit">
@@ -63,11 +127,13 @@
   <label for="notizen">Notizen (optional):</label>
   <textarea id="notizen" name="Notizen" rows="3" placeholder="Besonderheiten..."></textarea>
 
-  <button type="submit">📧 Loggen & Senden</button>
-  <div class="status" id="status"></div>
+  <button type="submit">Speichern</button>
+  <div id="status" class="status"></div>
 </form>
 
 <script>
+const endpoint = "https://formspree.io/f/maqplozn";
+
 const now = new Date();
 const offset = now.getTimezoneOffset() * 60000;
 document.getElementById('zeit').value = new Date(now - offset).toISOString().slice(0, 16);
@@ -121,52 +187,41 @@ function validateForm() {
 document.getElementById('zapfForm').addEventListener('submit', async function(e) {
   e.preventDefault();
 
-  if (!validateForm()) return;
-
-  const form = e.target;
   const status = document.getElementById('status');
-  status.textContent = 'Sende an Formspree...';
+  status.className = 'status';
 
-  const data = new FormData(form);
+  if (!validateForm()) {
+    status.textContent = 'Bitte markierte Felder ausfüllen.';
+    status.classList.add('fail');
+    return;
+  }
+
+  status.textContent = 'Sende...';
+
+  const formData = new FormData(this);
 
   try {
-    const response = await fetch(form.action, {
+    const response = await fetch(endpoint, {
       method: 'POST',
-      body: data,
-      headers: { 'Accept': 'application/json' }
+      body: formData,
+      headers: {
+        'Accept': 'application/json'
+      }
     });
 
     if (response.ok) {
-      status.textContent = 'Gespeichert. Mail wird geöffnet...';
-
-      const zeit = document.getElementById('zeit').value;
-      const flasche = document.getElementById('flasche').value;
-      const druck = document.getElementById('druck').value;
-      const liter = document.getElementById('liter').value;
-      const neuesFass = document.querySelector('input[name="Neues_Fass"]:checked').value;
-      const restFaesser = document.getElementById('restFaesser').value || 'Nicht angegeben';
-      const notizen = document.getElementById('notizen').value || 'Keine';
-
-      const to = 'anna.dallinger@edu.kl.ac.at';
-      const cc = 'nikolaus.zach@edu.kl.ac.at,events@oeh-kl.at';
-      const subject = encodeURIComponent(`CO2 ${flasche}: ${druck} bar | Fass: ${neuesFass}`);
-      const body = encodeURIComponent(
-        `Zapfprotokoll\n\n` +
-        `Zeit: ${zeit}\n` +
-        `CO2 Flasche: ${flasche}\n` +
-        `Restdruck: ${druck} bar\n` +
-        `Bier gezapft: ${liter} L\n` +
-        `Neues Fass: ${neuesFass}\n` +
-        `Rest Fässer: ${restFaesser}\n` +
-        `Notizen: ${notizen}`
-      );
-
-      window.location.href = `mailto:${to}?cc=${cc}&subject=${subject}&body=${body}`;
+      status.textContent = 'Erfolgreich gespeichert.';
+      status.classList.add('success');
+      this.reset();
+      document.getElementById('zeit').value = new Date(new Date() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      selectFass('NEIN');
     } else {
-      status.textContent = 'Formspree hat nicht akzeptiert. Prüfe den Endpoint im Dashboard.';
+      status.textContent = 'Senden fehlgeschlagen.';
+      status.classList.add('fail');
     }
-  } catch (err) {
-    status.textContent = 'Fehler beim Senden an Formspree.';
+  } catch (error) {
+    status.textContent = 'Netzwerkfehler beim Senden.';
+    status.classList.add('fail');
   }
 });
 </script>
