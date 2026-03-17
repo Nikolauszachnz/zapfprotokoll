@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="referrer" content="origin">
   <title>🍺 Zapfprotokoll</title>
   <style>
     body {
@@ -45,6 +44,9 @@
       margin-top: 20px;
       cursor: pointer;
     }
+    button:active {
+      background: #218838;
+    }
     .radio-group {
       display: flex;
       gap: 10px;
@@ -68,21 +70,18 @@
     }
     .error {
       border: 2px solid red !important;
+      background-color: #ffe6e6;
     }
     .error-text {
       color: red;
       font-size: 14px;
       margin-top: 4px;
+      font-weight: bold;
     }
     .status {
       margin-top: 14px;
       font-size: 14px;
-    }
-    .success {
-      color: #1e7e34;
-    }
-    .fail {
-      color: #b00020;
+      color: #666;
     }
   </style>
 </head>
@@ -91,139 +90,165 @@
 <h1>🍺 Zapfprotokoll</h1>
 
 <form id="zapfForm" novalidate>
-  <input type="hidden" name="_subject" value="Neuer Zapfeintrag">
-
   <label for="zeit">Datum & Uhrzeit:</label>
-  <input type="datetime-local" id="zeit" name="Zeit">
+  <input type="datetime-local" id="zeit">
 
   <label for="flasche">CO₂ Flasche:</label>
-  <select id="flasche" name="Flasche">
+  <select id="flasche">
     <option value="">Bitte wählen...</option>
     <option value="Flasche 1">Flasche 1</option>
     <option value="Flasche 2">Flasche 2</option>
   </select>
 
   <label for="druck">Restdruck CO₂ (bar):</label>
-  <input type="number" id="druck" name="CO2_Druck" step="0.1" inputmode="decimal" placeholder="z.B. 12.5">
+  <input type="number" id="druck" step="0.1" inputmode="decimal" placeholder="z.B. 12.5">
 
   <label for="liter">Gezapft Bier (Liter):</label>
-  <input type="number" id="liter" name="Bier_Liter" step="0.1" inputmode="decimal" placeholder="z.B. 25.0">
+  <input type="number" id="liter" step="0.1" inputmode="decimal" placeholder="z.B. 25.0">
 
   <label>Neues Fass geöffnet?</label>
   <div class="radio-group">
     <div class="radio-option" id="btnJa" onclick="selectFass('JA')">
-      <input type="radio" name="Neues_Fass" value="JA">
+      <input type="radio" name="neuesFass" value="JA">
       JA
     </div>
     <div class="radio-option selected" id="btnNein" onclick="selectFass('NEIN')">
-      <input type="radio" name="Neues_Fass" value="NEIN" checked>
+      <input type="radio" name="neuesFass" value="NEIN" checked>
       NEIN
     </div>
   </div>
 
   <label for="restFaesser">Restbestand Fässer (optional):</label>
-  <input type="number" id="restFaesser" name="Rest_Faesser" step="1" inputmode="numeric" placeholder="z.B. 3">
+  <input type="number" id="restFaesser" step="1" inputmode="numeric" placeholder="z.B. 3">
 
   <label for="notizen">Notizen (optional):</label>
-  <textarea id="notizen" name="Notizen" rows="3" placeholder="Besonderheiten..."></textarea>
+  <textarea id="notizen" rows="3" placeholder="Besonderheiten..."></textarea>
 
-  <button type="submit">Speichern</button>
+  <button type="button" onclick="sendData()">📧 Speichern & Mail senden</button>
   <div id="status" class="status"></div>
 </form>
 
 <script>
-const endpoint = "https://formspree.io/f/maqplozn";
+// Dein Formspree Endpoint
+const FORMSPREE_ENDPOINT = "https://formspree.io/f/maqplozn";
 
+// Auto Datum setzen
 const now = new Date();
 const offset = now.getTimezoneOffset() * 60000;
 document.getElementById('zeit').value = new Date(now - offset).toISOString().slice(0, 16);
 
+// JA/NEIN Buttons
 function selectFass(wert) {
-  document.querySelectorAll('input[name="Neues_Fass"]').forEach(r => {
+  document.querySelectorAll('input[name="neuesFass"]').forEach(r => {
     r.checked = (r.value === wert);
   });
   document.getElementById('btnJa').classList.toggle('selected', wert === 'JA');
   document.getElementById('btnNein').classList.toggle('selected', wert === 'NEIN');
 }
 
+// Validierung
 function clearErrors() {
   document.querySelectorAll('.error-text').forEach(e => e.remove());
   document.querySelectorAll('.error').forEach(e => e.classList.remove('error'));
-}
-
-function addError(id, text) {
-  const el = document.getElementById(id);
-  el.classList.add('error');
-  const msg = document.createElement('div');
-  msg.className = 'error-text';
-  msg.textContent = text;
-  el.insertAdjacentElement('afterend', msg);
+  document.getElementById('status').textContent = '';
 }
 
 function validateForm() {
   clearErrors();
   let ok = true;
 
-  if (!document.getElementById('zeit').value) {
-    addError('zeit', 'Bitte Datum eingeben');
-    ok = false;
-  }
-  if (!document.getElementById('flasche').value) {
-    addError('flasche', 'Bitte Flasche auswählen');
-    ok = false;
-  }
-  if (!document.getElementById('druck').value) {
-    addError('druck', 'Bitte Restdruck eingeben');
-    ok = false;
-  }
-  if (!document.getElementById('liter').value) {
-    addError('liter', 'Bitte Liter eingeben');
-    ok = false;
-  }
+  const felder = [
+    { id: 'zeit', text: '⚠️ Bitte Datum eingeben' },
+    { id: 'flasche', text: '⚠️ Bitte Flasche auswählen' },
+    { id: 'druck', text: '⚠️ Bitte Restdruck eingeben' },
+    { id: 'liter', text: '⚠️ Bitte Liter eingeben' }
+  ];
 
+  felder.forEach(feld => {
+    const el = document.getElementById(feld.id);
+    if (!el.value) {
+      el.classList.add('error');
+      const msg = document.createElement('div');
+      msg.className = 'error-text';
+      msg.textContent = feld.text;
+      el.insertAdjacentElement('afterend', msg);
+      ok = false;
+    }
+  });
+
+  if (!ok) {
+    document.querySelector('.error').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
   return ok;
 }
 
-document.getElementById('zapfForm').addEventListener('submit', async function(e) {
-  e.preventDefault();
+// Hauptfunktion: Erst Formspree, dann Mail
+async function sendData() {
+  if (!validateForm()) return;
 
   const status = document.getElementById('status');
-  status.className = 'status';
+  status.textContent = 'Speichere...';
 
-  if (!validateForm()) {
-    status.textContent = 'Bitte markierte Felder ausfüllen.';
-    status.classList.add('fail');
-    return;
-  }
+  // Werte sammeln
+  const zeit = document.getElementById('zeit').value;
+  const flasche = document.getElementById('flasche').value;
+  const druck = document.getElementById('druck').value;
+  const liter = document.getElementById('liter').value;
+  const neuesFass = document.querySelector('input[name="neuesFass"]:checked').value;
+  const restFaesser = document.getElementById('restFaesser').value || 'Nicht angegeben';
+  const notizen = document.getElementById('notizen').value || 'Keine';
 
-  status.textContent = 'Sende...';
-
-  const formData = new FormData(this);
-
+  // ==== SCHRITT 1: FORMSPREE (Tracking) ====
   try {
-    const response = await fetch(endpoint, {
+    await fetch(FORMSPREE_ENDPOINT, {
       method: 'POST',
-      body: formData,
-      headers: {
-        'Accept': 'application/json'
-      }
+      headers: { 
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        Zeit: zeit,
+        Flasche: flasche,
+        CO2_Druck: druck + ' bar',
+        Bier_Liter: liter + ' L',
+        Neues_Fass: neuesFass,
+        Rest_Faesser: restFaesser,
+        Notizen: notizen
+      })
     });
-
-    if (response.ok) {
-      status.textContent = 'Erfolgreich gespeichert.';
-      status.classList.add('success');
-      this.reset();
-      document.getElementById('zeit').value = new Date(new Date() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-      selectFass('NEIN');
-    } else {
-      status.textContent = 'Senden fehlgeschlagen.';
-      status.classList.add('fail');
-    }
-  } catch (error) {
-    status.textContent = 'Netzwerkfehler beim Senden.';
-    status.classList.add('fail');
+    status.textContent = 'Gespeichert. Öffne Mail...';
+  } catch (err) {
+    // Wenn Formspree fehlschlägt, trotzdem weiter mit Mail
+    status.textContent = 'Tracking fehlgeschlagen, öffne trotzdem Mail...';
   }
-});
+
+  // ==== SCHRITT 2: MAILTO (E-Mail öffnen) ====
+  // Kurze Verzögerung damit Formspree Zeit hat
+  setTimeout(() => {
+    const to = 'anna.dallinger@edu.kl.ac.at';
+    const cc = 'nikolaus.zach@edu.kl.ac.at,events@oeh-kl.at';
+    
+    const subject = encodeURIComponent(`CO2 ${flasche}: ${druck} bar | Fass: ${neuesFass}`);
+    const body = encodeURIComponent(
+      `Zapfprotokoll\n\n` +
+      `Zeit: ${zeit}\n` +
+      `CO2 Flasche: ${flasche}\n` +
+      `Restdruck: ${druck} bar\n` +
+      `Bier gezapft: ${liter} L\n` +
+      `Neues Fass: ${neuesFass}\n` +
+      `Rest Fässer: ${restFaesser}\n` +
+      `Notizen: ${notizen}`
+    );
+
+    // Mobile-freundlich: Unsichtbarer Link
+    const link = document.createElement('a');
+    link.href = `mailto:${to}?cc=${cc}&subject=${subject}&body=${body}`;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, 500);
+}
 </script>
 
 </body>
