@@ -26,48 +26,47 @@
 
 <h1>🍺 Zapfprotokoll</h1>
 
-<!-- novalidate umgeht die Browser-Blockade am Handy -->
 <form id="zapfForm" novalidate>
 
   <label>Datum:</label>
-  <input type="datetime-local" id="zeit" name="zeit">
+  <input type="datetime-local" id="zeit" name="Zeit">
 
   <label>CO₂ Flasche:</label>
-  <select id="flasche" name="flasche">
+  <select id="flasche" name="Flasche">
     <option value="">Bitte wählen...</option>
     <option value="Flasche 1">Flasche 1</option>
     <option value="Flasche 2">Flasche 2</option>
   </select>
 
   <label>Restdruck CO₂ (bar):</label>
-  <input type="number" id="druck" name="druck" step="0.1" inputmode="decimal">
+  <input type="number" id="druck" name="Restdruck" step="0.1" inputmode="decimal">
 
   <label>Gezapft Bier (Liter):</label>
-  <input type="number" id="liter" name="liter" step="0.1" inputmode="decimal">
+  <input type="number" id="liter" name="Gezapfte_Liter" step="0.1" inputmode="decimal">
 
   <label>Neues Fass geöffnet?</label>
   <div class="radio-group">
-    <div class="radio-option" onclick="selectFass('ja')">
-      <input type="radio" id="fassJa" name="neuesFass" value="JA">
+    <div class="radio-option" onclick="selectFass('JA')">
+      <input type="radio" id="fassJa" name="Neues_Fass" value="JA">
       JA
     </div>
-    <div class="radio-option selected" onclick="selectFass('nein')">
-      <input type="radio" id="fassNein" name="neuesFass" value="NEIN" checked>
+    <div class="radio-option selected" onclick="selectFass('NEIN')">
+      <input type="radio" id="fassNein" name="Neues_Fass" value="NEIN" checked>
       NEIN
     </div>
   </div>
 
   <label>Restbestand Fässer (optional):</label>
-  <input type="number" id="restFaesser" name="restFaesser" step="1" inputmode="numeric" placeholder="z.B. 3">
+  <input type="number" id="restFaesser" name="Restbestand_Faesser" step="1" inputmode="numeric" placeholder="z.B. 3">
 
   <label>Notizen (optional):</label>
-  <textarea id="notizen" name="notizen" rows="3" placeholder="Besonderheiten..."></textarea>
+  <textarea id="notizen" name="Notizen" rows="3" placeholder="Besonderheiten..."></textarea>
 
   <button type="button" onclick="sendData()">📧 Loggen & Senden</button>
 </form>
 
 <script>
-// Aktuelles Datum/Uhrzeit einsetzen (Handy-kompatibel)
+// Aktuelles Datum/Uhrzeit einsetzen
 const now = new Date();
 const offset = now.getTimezoneOffset() * 60000;
 const localISOTime = (new Date(now - offset)).toISOString().slice(0, 16);
@@ -75,22 +74,19 @@ document.getElementById('zeit').value = localISOTime;
 
 // Button-Logik für JA/NEIN
 function selectFass(wert) {
-  document.querySelectorAll('input[name="neuesFass"]').forEach(r => {
-    r.checked = (r.value.toLowerCase() === wert.toLowerCase());
+  document.querySelectorAll('input[name="Neues_Fass"]').forEach(r => {
+    r.checked = (r.value === wert);
   });
   document.querySelectorAll('.radio-option').forEach(opt => {
     opt.classList.remove('selected');
   });
-  // Event-Target Fallback für Handy
   const target = event.currentTarget || event.target.closest('.radio-option');
   if(target) target.classList.add('selected');
 }
 
-// Handfeste eigene Validierung (geht auf jedem Handy)
+// Validierung (Rote Rahmen wenn leer)
 function validieren() {
   let ok = true;
-  
-  // Alte Fehler löschen
   document.querySelectorAll('.fehler-text').forEach(e => e.remove());
   document.querySelectorAll('.fehler').forEach(e => e.classList.remove('fehler'));
 
@@ -114,54 +110,54 @@ function validieren() {
   });
 
   if (!ok) {
-    // Scrollt am Handy zum ersten Fehler
     document.querySelector('.fehler').scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
-
   return ok;
 }
 
 function sendData() {
   if (!validieren()) return;
 
-  // Werte auslesen
-  const zeit = document.getElementById('zeit').value;
-  const flasche = document.getElementById('flasche').value;
-  const druck = document.getElementById('druck').value;
-  const liter = document.getElementById('liter').value;
-  const neuesFass = document.querySelector('input[name="neuesFass"]:checked').value;
-  const restFaesser = document.getElementById('restFaesser').value || 'Nicht angegeben';
-  const notizen = document.getElementById('notizen').value || 'Keine Notizen';
+  // 1. Daten direkt aus dem Formular-Objekt holen (das ist der Fix für Formspree!)
+  const formElement = document.getElementById('zapfForm');
+  const formData = new FormData(formElement);
 
-  // 1. FORMSPREE BACKEND (für Google Sheets etc.)
-  // *** HIER DEINEN ECHTEN ENDPOINT EINTRAGEN ***
+  // Fallback für leere optionale Felder
+  if(!document.getElementById('restFaesser').value) formData.set('Restbestand_Faesser', '---');
+  if(!document.getElementById('notizen').value) formData.set('Notizen', '---');
+
+  // *** WICHTIG: HIER DEINEN FORMSPREE ENDPOINT EINTRAGEN! ***
   const formspreeEndpoint = "https://formspree.io/f/maqplozn"; 
   
-  if (formspreeEndpoint !== "https://formspree.io/f/maqplozn") {
-    const formData = new FormData();
-    formData.append("Zeit", zeit);
-    formData.append("Flasche", flasche);
-    formData.append("Druck", druck);
-    formData.append("Liter", liter);
-    formData.append("NeuesFass", neuesFass);
-    formData.append("RestFaesser", restFaesser);
-    formData.append("Notizen", notizen);
-
+  if (formspreeEndpoint && formspreeEndpoint.includes("/f/")) {
+    // Sende leise im Hintergrund an Formspree
     fetch(formspreeEndpoint, {
-      method: "POST",
+      method: 'POST',
       body: formData,
-      headers: { 'Accept': 'application/json' }
-    }).catch(err => console.log("Formspree Error:", err)); // Fehler ignorieren, damit Mail trotzdem aufgeht
+      headers: {
+        'Accept': 'application/json'
+      }
+    }).then(response => {
+      console.log("Formspree Status:", response.ok);
+    }).catch(error => console.error("Formspree Fehler:", error));
   }
 
-  // 2. MOBILE-MAILTO FIX (Öffnet Mail-App am Handy zuverlässig)
+  // 2. MOBILE-MAILTO FIX (Öffnet Mail-App)
+  const flasche = document.getElementById('flasche').value;
+  const druck = document.getElementById('druck').value;
+  const neuesFass = document.querySelector('input[name="Neues_Fass"]:checked').value;
+  const liter = document.getElementById('liter').value;
+  const zeit = document.getElementById('zeit').value;
+  const rest = document.getElementById('restFaesser').value || 'Nicht angegeben';
+  const notiz = document.getElementById('notizen').value || 'Keine Notizen';
+
   const to = 'anna.dallinger@edu.kl.ac.at';
   const cc = 'nikolaus.zach@edu.kl.ac.at,events@oeh-kl.at';
   
   const subject = encodeURIComponent(`CO2 ${flasche}: ${druck} bar | Fass: ${neuesFass}`);
-  const body = encodeURIComponent(`Zapfprotokoll\n\n⏰ Zeit: ${zeit}\n🏷️ CO2: ${flasche} (${druck} bar)\n🍺 Bier: ${liter} L\n🔄 Neues Fass: ${neuesFass}\n📦 Rest Fässer: ${restFaesser}\n📝 Notizen: ${notizen}`);
+  const body = encodeURIComponent(`Zapfprotokoll\n\n⏰ Zeit: ${zeit}\n🏷️ CO2: ${flasche} (${druck} bar)\n🍺 Bier: ${liter} L\n🔄 Neues Fass: ${neuesFass}\n📦 Rest Fässer: ${rest}\n📝 Notizen: ${notiz}`);
 
-  // Der unsichtbare Link-Trick fürs Handy
+  // Unsichtbarer Link-Trick fürs Handy
   const mailtoLink = `mailto:${to}?cc=${cc}&subject=${subject}&body=${body}`;
   const link = document.createElement('a');
   link.href = mailtoLink;
@@ -169,11 +165,8 @@ function sendData() {
   document.body.appendChild(link);
   link.click();
   
-  // Cleanup
   setTimeout(() => {
     document.body.removeChild(link);
-    // Optional: Formular nach 2 Sekunden zurücksetzen
-    // document.getElementById('zapfForm').reset();
   }, 500);
 }
 </script>
