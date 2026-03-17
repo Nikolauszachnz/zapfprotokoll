@@ -12,30 +12,33 @@
     .radio-option { flex: 1; text-align: center; padding: 12px; border: 2px solid #ddd; border-radius: 8px; background: white; cursor: pointer; }
     .radio-option.selected { border-color: #28a745; background: #e8f5e8; }
     .radio-option input { display: none; }
+    .fehler { border: 2px solid red !important; }
+    .fehler-text { color: red; font-size: 13px; margin: 0; }
   </style>
 </head>
 <body>
 
 <h1>🍺 Zapfprotokoll</h1>
 
-<!-- WICHTIG: Keine 'action' mehr im form-Tag, wir machen alles per JavaScript -->
-<form id="zapfForm">
+<!-- novalidate = Browser-Validierung AUS, wir machen es selbst -->
+<form id="zapfForm" novalidate>
+
   <label>Datum:</label>
-  <input type="datetime-local" id="zeit" name="zeit" required>
-  
+  <input type="datetime-local" id="zeit" name="zeit">
+
   <label>CO₂ Flasche:</label>
-  <select id="flasche" name="flasche" required>
+  <select id="flasche" name="flasche">
     <option value="">Auswählen</option>
     <option value="Flasche 1">Flasche 1</option>
     <option value="Flasche 2">Flasche 2</option>
   </select>
-  
+
   <label>Restdruck CO₂ (bar):</label>
-  <input type="number" id="druck" name="druck" step="0.1" required>
-  
+  <input type="number" id="druck" name="druck" step="0.1">
+
   <label>Gezapft Bier (L):</label>
-  <input type="number" id="liter" name="liter" step="0.1" required>
-  
+  <input type="number" id="liter" name="liter" step="0.1">
+
   <label>Neues Fass geöffnet?</label>
   <div class="radio-group">
     <div class="radio-option" onclick="selectFass('ja')">
@@ -47,13 +50,13 @@
       <strong>NEIN</strong>
     </div>
   </div>
-  
+
   <label>Restbestand Fässer (optional):</label>
   <input type="number" id="restFaesser" name="restFaesser" step="1" placeholder="z.B. 3">
-  
+
   <label>Notizen:</label>
   <textarea id="notizen" name="notizen" rows="3"></textarea>
-  
+
   <button type="button" onclick="sendData()">📧 Loggen & Tracken</button>
 </form>
 
@@ -61,7 +64,7 @@
 // Auto-Datum
 document.getElementById('zeit').value = new Date().toISOString().slice(0,16);
 
-// Ja/Nein Buttons
+// JA/NEIN Buttons
 function selectFass(wert) {
   document.querySelectorAll('input[name="neuesFass"]').forEach(r => {
     r.checked = (r.value === wert);
@@ -72,8 +75,41 @@ function selectFass(wert) {
   event.target.closest('.radio-option').classList.add('selected');
 }
 
+// Validierung selbst prüfen
+function validieren() {
+  let ok = true;
+
+  // Alle alten Fehlermeldungen entfernen
+  document.querySelectorAll('.fehler-text').forEach(e => e.remove());
+  document.querySelectorAll('.fehler').forEach(e => e.classList.remove('fehler'));
+
+  const felder = [
+    { id: 'zeit', label: 'Datum fehlt!' },
+    { id: 'flasche', label: 'Bitte Flasche auswählen!' },
+    { id: 'druck', label: 'Restdruck fehlt!' },
+    { id: 'liter', label: 'Liter fehlt!' },
+  ];
+
+  felder.forEach(f => {
+    const el = document.getElementById(f.id);
+    if (!el.value) {
+      el.classList.add('fehler');
+      const msg = document.createElement('p');
+      msg.className = 'fehler-text';
+      msg.textContent = f.label;
+      el.after(msg);
+      ok = false;
+    }
+  });
+
+  return ok;
+}
+
 function sendData() {
-  // 1. Werte auslesen
+  // Erst validieren
+  if (!validieren()) return;
+
+  // Werte auslesen
   const zeit = document.getElementById('zeit').value;
   const flasche = document.getElementById('flasche').value;
   const druck = document.getElementById('druck').value;
@@ -82,30 +118,27 @@ function sendData() {
   const restFaesser = document.getElementById('restFaesser').value;
   const notizen = document.getElementById('notizen').value;
 
-  // ==== TEIL 1: DATEN AN FORMSPREE SENDEN (Hintergrund) ====
-  // HIER DEINEN FORMSPREE ENDPOINT EINTRAGEN!
-  const formspreeEndpoint = "https://formspree.io/f/maqplozn"; 
-  
+  // ==== FORMSPREE (Hintergrund, für Google Sheets) ====
+  const formspreeEndpoint = "https://formspree.io/f/DEIN_ENDPOINT_HIER";
+
   const formData = new FormData();
   formData.append("Zeit", zeit);
   formData.append("Flasche", flasche);
-  formData.append("Druck", druck);
+  formData.append("CO2_Druck", druck);
   formData.append("Liter", liter);
   formData.append("Neues_Fass", neuesFass);
-  formData.append("Rest_Faesser", restFaesser);
-  formData.append("Notizen", notizen);
+  formData.append("Rest_Faesser", restFaesser || "---");
+  formData.append("Notizen", notizen || "---");
 
-  // Sende Daten leise im Hintergrund an Formspree
   fetch(formspreeEndpoint, {
     method: "POST",
     body: formData,
     headers: { 'Accept': 'application/json' }
   });
 
-  // ==== TEIL 2: E-MAIL PROGRAMM ÖFFNEN ====
+  // ==== E-MAIL (Mailprogramm öffnen) ====
   const to = 'anna.dallinger@edu.kl.ac.at';
-  const cc1 = 'nikolaus.zach@edu.kl.ac.at';
-  const cc2 = 'events@oeh-kl.at';
+  const cc = 'nikolaus.zach@edu.kl.ac.at,events@oeh-kl.at';
 
   const subject = encodeURIComponent(`CO2 ${flasche}: ${druck} bar | Fass: ${neuesFass}`);
   const body = encodeURIComponent(`
@@ -120,8 +153,7 @@ ${restFaesser ? `📦 Rest Fässer: ${restFaesser}` : ''}
 📝 Notizen: ${notizen || '---'}
   `);
 
-  // Öffnet das Mailprogramm mit vorausgefüllten Daten
-  window.location.href = `mailto:${to}?cc=${cc1},${cc2}&subject=${subject}&body=${body}`;
+  window.location.href = `mailto:${to}?cc=${cc}&subject=${subject}&body=${body}`;
 }
 </script>
 
